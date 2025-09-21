@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프로젝트 관리 시스템 - 실제 파일 지원</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .hidden { display: none !important; }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 50;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #3b82f6 var(--progress), #e5e7eb var(--progress));
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+        .file-drop-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .file-drop-zone:hover,
+        .file-drop-zone.dragover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            background: white;
+        }
+        .file-item:hover {
+            background-color: #f9fafb;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50">
+    <!-- 헤더 -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <h1 class="text-2xl font-bold text-gray-900">프로젝트 관리 시스템</h1>
+                <div class="flex items-center space-x-4">
+                    <div class="text-sm text-gray-600">
+                        저장된 데이터: <span id="storageInfo">계산 중...</span>
+                    </div>
+                    <button id="exportBtn" class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">
+                        💾 데이터 내보내기
+                    </button>
+                    <input type="file" id="importFile" accept=".json" class="hidden">
+                    <button id="importBtn" class="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700">
+                        📁 데이터 가져오기
+                    </button>
+                    <button id="dashboardBtn" class="flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white">
+                        📊 대시보드
+                    </button>
+                    <button id="projectsBtn" class="flex items-center px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">
+                        📋 프로젝트 목록
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- 대시보드 뷰 -->
+        <div id="dashboardView" class="space-y-6">
+            <!-- 월별 선택 -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold text-gray-900">월별 대시보드</h2>
+                    <div class="flex space-x-4">
+                        <select id="yearSelect" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="2025" selected>2025년</option>
+                            <option value="2026">2026년</option>
+                            <option value="2027">2027년</option>
+                        </select>
+                        <select id="monthSelect" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="0">1월</option>
+                            <option value="1">2월</option>
+                            <option value="2">3월</option>
+                            <option value="3">4월</option>
+                            <option value="4">5월</option>
+                            <option value="5">6월</option>
+                            <option value="6">7월</option>
+                            <option value="7">8월</option>
+                            <option value="8" selected>9월</option>
+                            <option value="9">10월</option>
+                            <option value="10">11월</option>
+                            <option value="11">12월</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 주요 지표 -->
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                    <div class="bg-blue-50 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="text-3xl">📅</div>
+                            <div class="ml-3">
+                                <p class="text-sm text-blue-600">총 프로젝트</p>
+                                <p id="totalProjects" class="text-2xl font-bold text-blue-900">3</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="text-3xl">✅</div>
+                            <div class="ml-3">
+                                <p class="text-sm text-green-600">완료</p>
+                                <p id="completedProjects" class="text-2xl font-bold text-green-900">1</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-yellow-50 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="text-3xl">🕐</div>
+                            <div class="ml-3">
+                                <p class="text-sm text-yellow-600">진행중</p>
+                                <p id="inProgressProjects" class="text-2xl font-bold text-yellow-900">1</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-purple-50 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="text-3xl">⚡</div>
+                            <div class="ml-3">
+                                <p class="text-sm text-purple-600">평균 진행률</p>
+                                <p id="avgProgress" class="text-2xl font-bold text-purple-900">62%</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-indigo-50 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="text-3xl">📁</div>
+                            <div class="ml-3">
+                                <p class="text-sm text-indigo-600">총 파일</p>
+                                <p id="totalFiles" class="text-2xl font-bold text-indigo-900">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 차트 섹션 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- 카테고리별 분포 -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">카테고리별 프로젝트 분포</h3>
+                    <div class="chart-container">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 상태별 분포 -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">상태별 프로젝트 분포</h3>
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 프로젝트 진행도 -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">프로젝트 진행도</h3>
+                <div id="progressList" class="space-y-4">
+                    <!-- 동적으로 생성됨 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 프로젝트 목록 뷰 -->
+        <div id="projectsView" class="space-y-6 hidden">
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold text-gray-900">프로젝트 목록</h2>
+                <button id="addProjectBtn" class="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    ➕ 새 프로젝트
+                </button>
+            </div>
+
+            <!-- 프로젝트 목록 -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">프로젝트명</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">카테고리</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">진행도</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">기간</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">파일</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="projectsTableBody" class="bg-white divide-y divide-gray-200">
+                            <!-- 동적으로 생성됨 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 프로젝트 추가/편집 모달 -->
+    <div id="projectModal" class="modal-overlay hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <h3 id="modalTitle" class="text-lg font-bold text-gray-900 mb-4">새 프로젝트 추가</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">프로젝트명</label>
+                    <input id="projectName" type="text" class="w-full rounded-md border-gray-300 shadow-sm" required>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">카테고리</label>
+                    <select id="projectCategory" class="w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="솔루션">솔루션</option>
+                        <option value="컨설팅">컨설팅</option>
+                        <option value="강의">강의</option>
+                        <option value="기타">기타</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">상태</label>
+                    <select id="projectStatus" class="w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="계획">계획</option>
+                        <option value="진행중">진행중</option>
+                        <option value="완료">완료</option>
+                        <option value="보류">보류</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">진행도 (<span id="progressValue">0</span>%)</label>
+                    <input id="projectProgress" type="range" min="0" max="100" value="0" class="w-full">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">시작일</label>
+                    <input id="projectStartDate" type="date" class="w-full rounded-md border-gray-300 shadow-sm" required>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">종료일</label>
+                    <input id="projectEndDate" type="date" class="w-full rounded-md border-gray-300 shadow-sm" required>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">설명</label>
+                    <textarea id="projectDescription" class="w-full rounded-md border-gray-300 shadow-sm" rows="3"></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button id="cancelBtn" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">취소</button>
+                    <button id="saveBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 파일 관리 모달 -->
+    <div id="fileModal" class="modal-overlay hidden">
+        <div class="relative top-10 mx-auto p-5 border w-5/6 max-w-5xl shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="fileModalTitle" class="text-xl font-bold text-gray-900">파일 관리</h3>
+                <button id="closeFileModal" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+            </div>
+
+            <!-- 파일 업로드 섹션 -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                <h4 class="text-lg font-semibold text-gray-700 mb-3">파일 업로드</h4>
+                
+                <!-- 드래그 앤 드롭 영역 -->
+                <div id="fileDropZone" class="file-drop-zone mb-4">
+                    <div class="text-4xl mb-2">📁</div>
+                    <p class="text-lg font-medium text-gray-700">파일을 드래그하여 놓거나 클릭하여 선택</p>
+                    <p class="text-sm text-gray-500 mt-1">최대 10MB, 모든 파일 형식 지원</p>
+                    <input type="file" id="fileInput" class="hidden" multiple>
+                </div>
+
+                <!-- 폴더 선택 -->
+                <div class="flex items-center space-x-3">
+                    <label class="text-sm font-medium text-gray-700">폴더:</label>
+                    <select id="uploadFileFolder" class="rounded-md border-gray-300 shadow-sm">
+                        <option value="문서">문서</option>
+                        <option value="디자인">디자인</option>
+                        <option value="분석">분석</option>
+                        <option value="강의자료">강의자료</option>
+                        <option value="소스코드">소스코드</option>
+                        <option value="기타">기타</option>
+                    </select>
+                    <button id="uploadBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50" disabled>
+                        📤 업로드
+                    </button>
+                </div>
+            </div>
+
+            <!-- 폴더 필터 -->
+            <div class="mb-4">
+                <div id="folderFilters" class="flex space-x-2 flex-wrap">
+                    <!-- 동적으로 생성됨 -->
+                </div>
+            </div>
+
+            <!-- 파일 목록 -->
+            <div class="bg-white border rounded-lg">
+                <div class="px-4 py-3 border-b bg-gray-50 flex justify-between items-center">
+                    <h4 class="text-lg font-semibold text-gray-700">파일 목록 (<span id="fileCount">0</span>개)</h4>
+                    <div class="text-sm text-gray-600">
+                        총 용량: <span id="totalFileSize">0 KB</span>
+                    </div>
+                </div>
+                
+                <div id="fileList" class="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+                    <!-- 동적으로 생성됨 -->
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button id="closeFileModalBtn" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 데이터 저장소 - LocalStorage 사용
+        let projects = [];
+        let currentView = 'dashboard';
+        let selectedMonth = 8; // 9월 (0-based)
+        let selectedYear = 2025;
+        let editingProject = null;
+        let selectedProject = null;
+        let selectedFolder = '전체';
+        let selectedFiles = [];
+
+        // 상태 색상
+        const statusColors = {
+            "계획": "bg-yellow-100 text-yellow-800",
+            "진행중": "bg-blue-100 text-blue-800", 
+            "완료": "bg-green-100 text-green-800",
+            "보류": "bg-red-100 text-red-800"
+        };
+
+        // 파일 타입별 아이콘
+        const fileIcons = {
+            document: "📄", image: "🖼️", spreadsheet: "📊",
+            presentation: "📽️", archive: "📦", video: "🎬",
+            audio: "🎵", default: "📎"
+        };
+
+        // LocalStorage 관리
+        function saveToStorage() {
+            try {
+                localStorage.setItem('projectManagementData', JSON.stringify(projects));
+                updateStorageInfo();
+            } catch (e) {
+                console.error('저장 실패:', e);
+                alert('데이터 저장에 실패했습니다.');
+            }
+        }
+
+        function loadFromStorage() {
+            try {
+                const data = localStorage.getItem('projectManagementData');
+                if (data) {
+                    projects = JSON.parse(data);
+                } else {
+                    // 초기 샘플 데이터
+                    projects = [
+                        {
+                            id: 1,
+                            name: "웹사이트 리뉴얼",
+                            category: "솔루션",
+                            startDate: "2025-08-01",
+                            endDate: "2025-10-31",
+                            status: "진행중",
+                            progress: 65,
+                            description: "회사 웹사이트 전면 리뉴얼",
+                            files: []
+                        }
+                    ];
+                    saveToStorage();
+                }
+                updateStorageInfo();
+            } catch (e) {
+                console.error('로드 실패:', e);
+                projects = [];
+            }
+        }
+
+        function updateStorageInfo() {
+            const dataSize = new Blob([JSON.stringify(projects)]).size;
+            const sizeText = dataSize < 1024 ? `${dataSize}B` : 
+                           dataSize < 1024*1024 ? `${(dataSize/1024).toFixed(1)}KB` :
+                           `${(dataSize/1024/1024).toFixed(1)}MB`;
+            document.getElementById('storageInfo').textContent = sizeText;
+        }
+
+        // 파일 관리
+        function readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function getFileTypeFromName(fileName) {
+            const extension = fileName.split('.').pop().toLowerCase();
+            const typeMap = {
+                'pdf': 'document', 'doc': 'document', 'docx': 'document', 'txt': 'document',
+                'jpg': 'image', 'jpeg': 'image', 'png': 'image', 'gif': 'image', 'svg': 'image', 'webp': 'image',
+                'xls': 'spreadsheet', 'xlsx': 'spreadsheet', 'csv': 'spreadsheet',
+                'ppt': 'presentation', 'pptx': 'presentation',
+                'zip': 'archive', 'rar': 'archive', '7z': 'archive',
+                'mp4': 'video', 'avi': 'video', 'mov': 'video',
+                'mp3': 'audio', 'wav': 'audio', 'flac': 'audio'
+            };
+            return typeMap[extension] || 'default';
+        }
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFromStorage();
+            initializeEventListeners();
+            renderDashboard();
+            renderProjectsList();
+            updateCharts();
+        });
+
+        function initializeEventListeners() {
+            // 뷰 전환
+            document.getElementById('dashboardBtn').addEventListener('click', () => switchView('dashboard'));
+            document.getElementById('projectsBtn').addEventListener('click', () => switchView('projects'));
+
+            // 데이터 관리
+            document.getElementById('exportBtn').addEventListener('click', exportData);
+            document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+            document.getElementById('importFile').addEventListener('change', importData);
+
+            // 월/년 선택
+            document.getElementById('monthSelect').addEventListener('change', (e) => {
+                selectedMonth = parseInt(e.target.value);
+                renderDashboard();
+                updateCharts();
+            });
+            document.getElementById('yearSelect').addEventListener('change', (e) => {
+                selectedYear = parseInt(e.target.value);
+                renderDashboard();
+                updateCharts();
+            });
+
+            // 프로젝트 모달
+            document.getElementById('addProjectBtn').addEventListener('click', () => openProjectModal());
+            document.getElementById('cancelBtn').addEventListener('click', () => closeProjectModal());
+            document.getElementById('saveBtn').addEventListener('click', () => saveProject());
+            document.getElementById('projectProgress').addEventListener('input', (e) => {
+                document.getElementById('progressValue').textContent = e.target.value;
+            });
+
+            // 파일 모달
+            document.getElementById('closeFileModal').addEventListener('click', () => closeFileModal());
+            document.getElementById('closeFileModalBtn').addEventListener('click', () => closeFileModal());
+            
+            // 파일 업로드
+            const fileDropZone = document.getElementById('fileDropZone');
+            const fileInput = document.getElementById('fileInput');
+            
+            fileDropZone.addEventListener('click', () => fileInput.click());
+            fileDropZone.addEventListener('dragover', handleDragOver);
+            fileDropZone.addEventListener('dragleave', handleDragLeave);
+            fileDropZone.addEventListener('drop', handleFileDrop);
+            
+            fileInput.addEventListener('change', handleFileSelect);
+            document.getElementById('uploadBtn').addEventListener('click', uploadFiles);
+        }
+
+        function exportData() {
+            const dataStr = JSON.stringify(projects, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `프로젝트관리_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (confirm('현재 데이터를 덮어쓰시겠습니까?')) {
+                        projects = importedData;
+                        saveToStorage();
+                        renderDashboard();
+                        renderProjectsList();
+                        updateCharts();
+                        alert('데이터를 성공적으로 가져왔습니다.');
+                    }
+                } catch (error) {
+                    alert('파일 형식이 올바르지 않습니다.');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+        }
+
+        function handleFileDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files);
+            selectedFiles = files;
+            updateFileUploadUI();
+        }
+
+        function handleFileSelect(e) {
+            selectedFiles = Array.from(e.target.files);
+            updateFileUploadUI();
+        }
+
+        function updateFileUploadUI() {
+            const uploadBtn = document.getElementById('uploadBtn');
+            if (selectedFiles.length > 0) {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = `📤 ${selectedFiles.length}개 파일 업로드`;
+            } else {
+                uploadBtn.disabled = true;
+                uploadBtn.textContent = '📤 업로드';
+            }
+        }
+
+        async function uploadFiles() {
+            if (selectedFiles.length === 0) return;
+
+            const folder = document.getElementById('uploadFileFolder').value;
+            const uploadBtn = document.getElementById('uploadBtn');
+            
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '업로드 중...';
+
+            try {
+                for (const file of selectedFiles) {
+                    // 파일 크기 제한 (10MB)
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert(`${file.name}: 파일 크기가 10MB를 초과합니다.`);
+                        continue;
+                    }
+
+                    const base64Data = await readFileAsBase64(file);
+                    const newFile = {
+                        id: Date.now() + Math.random(),
+                        name: file.name,
+                        type: getFileTypeFromName(file.name),
+                        size: file.size,
+                        uploadDate: new Date().toISOString().split('T')[0],
+                        folder: folder,
+                        data: base64Data
+                    };
+
+                    if (!selectedProject.files) {
+                        selectedProject.files = [];
+                    }
+                    selectedProject.files.push(newFile);
+                }
+
+                // 프로젝트 배열 업데이트
+                const projectIndex = projects.findIndex(p => p.id === selectedProject.id);
+                projects[projectIndex] = selectedProject;
+                
+                saveToStorage();
+                selectedFiles = [];
+                document.getElementById('fileInput').value = '';
+                updateFileUploadUI();
+                renderFolderFilters();
+                renderFileList();
+                renderProjectsList();
+                
+                alert('파일이 성공적으로 업로드되었습니다.');
+            } catch (error) {
+                console.error('업로드 실패:', error);
+                alert('파일 업로드에 실패했습니다.');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '📤 업로드';
+            }
+        }
+
+        function downloadFile(fileId) {
+            const file = selectedProject.files.find(f => f.id === fileId);
+            if (!file || !file.data) {
+                alert('파일 데이터를 찾을 수 없습니다.');
+                return;
+            }
+
+            try {
+                const link = document.createElement('a');
+                link.href = file.data;
+                link.download = file.name;
+                link.click();
+            } catch (error) {
+                console.error('다운로드 실패:', error);
+                alert('파일 다운로드에 실패했습니다.');
+            }
+        }
+
+        function switchView(view) {
+            currentView = view;
+            
+            if (view === 'dashboard') {
+                document.getElementById('dashboardView').classList.remove('hidden');
+                document.getElementById('projectsView').classList.add('hidden');
+                document.getElementById('dashboardBtn').className = 'flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white';
+                document.getElementById('projectsBtn').className = 'flex items-center px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200';
+            } else {
+                document.getElementById('dashboardView').classList.add('hidden');
+                document.getElementById('projectsView').classList.remove('hidden');
+                document.getElementById('dashboardBtn').className = 'flex items-center px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200';
+                document.getElementById('projectsBtn').className = 'flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white';
+            }
+        }
+
+        function getMonthlyProjects() {
+            return projects.filter(project => {
+                const startDate = new Date(project.startDate);
+                const endDate = new Date(project.endDate);
+                const targetDate = new Date(selectedYear, selectedMonth, 1);
+                
+                return (startDate <= targetDate && endDate >= targetDate) ||
+                       (startDate.getMonth() === selectedMonth && startDate.getFullYear() === selectedYear);
+            });
+        }
+
+        function renderDashboard() {
+            const monthlyProjects = getMonthlyProjects();
+            
+            // 통계 업데이트
+            document.getElementById('totalProjects').textContent = monthlyProjects.length;
+            document.getElementById('completedProjects').textContent = monthlyProjects.filter(p => p.status === '완료').length;
+            document.getElementById('inProgressProjects').textContent = monthlyProjects.filter(p => p.status === '진행중').length;
+            
+            const avgProgress = monthlyProjects.length > 0 
+                ? Math.round(monthlyProjects.reduce((sum, p) => sum + p.progress, 0) / monthlyProjects.length)
+                : 0;
+            document.getElementById('avgProgress').textContent = avgProgress + '%';
+
+            // 총 파일 수
+            const totalFiles = projects.reduce((sum, p) => sum + (p.files ? p.files.length : 0), 0);
+            document.getElementById('totalFiles').textContent = totalFiles;
+
+            // 진행도 목록
+            const progressList = document.getElementById('progressList');
+            progressList.innerHTML = '';
+            
+            monthlyProjects.forEach(project => {
+                const projectDiv = document.createElement('div');
+                projectDiv.className = 'border rounded-lg p-4';
+                projectDiv.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-medium text-gray-900">${project.name}</h4>
+                        <span class="px-2 py-1 rounded-full text-xs font-medium ${statusColors[project.status]}">${project.status}</span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-1 bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: ${project.progress}%"></div>
+                        </div>
+                        <span class="text-sm text-gray-600">${project.progress}%</span>
+                    </div>
+                `;
+                progressList.appendChild(projectDiv);
+            });
+        }
+
+        function renderProjectsList() {
+            const tbody = document.getElementById('projectsTableBody');
+            tbody.innerHTML = '';
+            
+            projects.forEach(project => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div>
+                            <div class="text-sm font-medium text-gray-900">${project.name}</div>
+                            <div class="text-sm text-gray-500">${project.description}</div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">${project.category}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium ${statusColors[project.status]}">${project.status}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="w-full bg-gray-200 rounded-full h-2 mr-2">
+                                <div class="bg-blue-600 h-2 rounded-full" style="width: ${project.progress}%"></div>
+                            </div>
+                            <span class="text-sm text-gray-600">${project.progress}%</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${project.startDate} ~ ${project.endDate}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center text-sm text-gray-900">
+                            📁 ${project.files ? project.files.length : 0}개
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div class="flex space-x-2">
+                            <button onclick="editProject(${project.id})" class="text-blue-600 hover:text-blue-900" title="편집">✏️</button>
+                            <button onclick="openFileManager(${project.id})" class="text-green-600 hover:text-green-900" title="파일관리">📁</button>
+                            <button onclick="deleteProject(${project.id})" class="text-red-600 hover:text-red-900" title="삭제">🗑️</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function updateCharts() {
+            const monthlyProjects = getMonthlyProjects();
+            
+            // 카테고리별 통계
+            const categoryStats = ["솔루션", "컨설팅", "강의", "기타"].map(cat => ({
+                name: cat,
+                count: monthlyProjects.filter(p => p.category === cat).length
+            }));
+
+            // 상태별 통계
+            const statusStats = ["계획", "진행중", "완료", "보류"].map(status => ({
+                name: status,
+                count: monthlyProjects.filter(p => p.status === status).length
+            }));
+
+            // 기존 차트 삭제
+            Chart.getChart('categoryChart')?.destroy();
+            Chart.getChart('statusChart')?.destroy();
+
+            // 카테고리 차트
+            new Chart(document.getElementById('categoryChart'), {
+                type: 'pie',
+                data: {
+                    labels: categoryStats.map(s => s.name),
+                    datasets: [{
+                        data: categoryStats.map(s => s.count),
+                        backgroundColor: ['#8884d8', '#82ca9d', '#ffc658', '#ff7300']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // 상태 차트
+            new Chart(document.getElementById('statusChart'), {
+                type: 'bar',
+                data: {
+                    labels: statusStats.map(s => s.name),
+                    datasets: [{
+                        data: statusStats.map(s => s.count),
+                        backgroundColor: '#8884d8'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function openProjectModal(project = null) {
+            editingProject = project;
+            const modal = document.getElementById('projectModal');
+            const title = document.getElementById('modalTitle');
+            
+            if (project) {
+                title.textContent = '프로젝트 편집';
+                document.getElementById('projectName').value = project.name;
+                document.getElementById('projectCategory').value = project.category;
+                document.getElementById('projectStatus').value = project.status;
+                document.getElementById('projectProgress').value = project.progress;
+                document.getElementById('progressValue').textContent = project.progress;
+                document.getElementById('projectStartDate').value = project.startDate;
+                document.getElementById('projectEndDate').value = project.endDate;
+                document.getElementById('projectDescription').value = project.description;
+            } else {
+                title.textContent = '새 프로젝트 추가';
+                document.getElementById('projectName').value = '';
+                document.getElementById('projectCategory').value = '솔루션';
+                document.getElementById('projectStatus').value = '계획';
+                document.getElementById('projectProgress').value = 0;
+                document.getElementById('progressValue').textContent = '0';
+                document.getElementById('projectStartDate').value = '';
+                document.getElementById('projectEndDate').value = '';
+                document.getElementById('projectDescription').value = '';
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeProjectModal() {
+            document.getElementById('projectModal').classList.add('hidden');
+            editingProject = null;
+        }
+
+        function saveProject() {
+            const name = document.getElementById('projectName').value.trim();
+            const startDate = document.getElementById('projectStartDate').value;
+            const endDate = document.getElementById('projectEndDate').value;
+            
+            if (!name || !startDate || !endDate) {
+                alert('필수 항목을 모두 입력해주세요.');
+                return;
+            }
+
+            const projectData = {
+                name: name,
+                category: document.getElementById('projectCategory').value,
+                status: document.getElementById('projectStatus').value,
+                progress: parseInt(document.getElementById('projectProgress').value),
+                startDate: startDate,
+                endDate: endDate,
+                description: document.getElementById('projectDescription').value,
+                files: editingProject ? editingProject.files : []
+            };
+
+            if (editingProject) {
+                const index = projects.findIndex(p => p.id === editingProject.id);
+                projects[index] = { ...projectData, id: editingProject.id };
+            } else {
+                projects.push({ ...projectData, id: Date.now() });
+            }
+
+            saveToStorage();
+            closeProjectModal();
+            renderProjectsList();
+            renderDashboard();
+            updateCharts();
+        }
+
+        function editProject(id) {
+            const project = projects.find(p => p.id === id);
+            openProjectModal(project);
+        }
+
+        function deleteProject(id) {
+            if (confirm('정말 삭제하시겠습니까?')) {
+                projects = projects.filter(p => p.id !== id);
+                saveToStorage();
+                renderProjectsList();
+                renderDashboard();
+                updateCharts();
+            }
+        }
+
+        function openFileManager(projectId) {
+            selectedProject = projects.find(p => p.id === projectId);
+            selectedFolder = '전체';
+            
+            document.getElementById('fileModalTitle').textContent = `${selectedProject.name} - 파일 관리`;
+            document.getElementById('fileModal').classList.remove('hidden');
+            
+            renderFolderFilters();
+            renderFileList();
+        }
+
+        function closeFileModal() {
+            document.getElementById('fileModal').classList.add('hidden');
+            selectedProject = null;
+            selectedFolder = '전체';
+            selectedFiles = [];
+            updateFileUploadUI();
+        }
+
+        function renderFolderFilters() {
+            const folders = getProjectFolders();
+            const container = document.getElementById('folderFilters');
+            container.innerHTML = '';
+            
+            folders.forEach(folder => {
+                const button = document.createElement('button');
+                button.className = `px-3 py-1 rounded-full text-sm font-medium ${
+                    selectedFolder === folder 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`;
+                button.textContent = `📁 ${folder}`;
+                button.addEventListener('click', () => {
+                    selectedFolder = folder;
+                    renderFolderFilters();
+                    renderFileList();
+                });
+                container.appendChild(button);
+            });
+        }
+
+        function getProjectFolders() {
+            if (!selectedProject.files) return ['전체'];
+            const folders = [...new Set(selectedProject.files.map(f => f.folder))];
+            return ['전체', ...folders];
+        }
+
+        function getFilteredFiles() {
+            if (!selectedProject?.files) return [];
+            if (selectedFolder === '전체') return selectedProject.files;
+            return selectedProject.files.filter(f => f.folder === selectedFolder);
+        }
+
+        function renderFileList() {
+            const files = getFilteredFiles();
+            const container = document.getElementById('fileList');
+            const countElement = document.getElementById('fileCount');
+            const sizeElement = document.getElementById('totalFileSize');
+            
+            countElement.textContent = files.length;
+            
+            const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
+            sizeElement.textContent = formatFileSize(totalSize);
+            
+            container.innerHTML = '';
+            
+            if (files.length === 0) {
+                container.innerHTML = `
+                    <div class="p-8 text-center text-gray-500">
+                        <div class="text-6xl mb-3">📁</div>
+                        <p>파일이 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            files.forEach(file => {
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'px-4 py-3 hover:bg-gray-50';
+                fileDiv.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="text-2xl">${fileIcons[file.type] || fileIcons.default}</div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">${file.name}</p>
+                                <p class="text-xs text-gray-500">${formatFileSize(file.size || 0)} • ${file.uploadDate} • ${file.folder}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="downloadFile(${file.id})" class="text-blue-600 hover:text-blue-900" title="다운로드">💾</button>
+                            <button onclick="deleteFile(${file.id})" class="text-red-600 hover:text-red-900" title="삭제">🗑️</button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(fileDiv);
+            });
+        }
+
+        function deleteFile(fileId) {
+            if (confirm('파일을 삭제하시겠습니까?')) {
+                selectedProject.files = selectedProject.files.filter(f => f.id !== fileId);
+                
+                const projectIndex = projects.findIndex(p => p.id === selectedProject.id);
+                projects[projectIndex] = selectedProject;
+                
+                saveToStorage();
+                renderFileList();
+                renderProjectsList();
+            }
+        }
+
+        // 전역 함수로 노출
+        window.editProject = editProject;
+        window.deleteProject = deleteProject;
+        window.openFileManager = openFileManager;
+        window.downloadFile = downloadFile;
+        window.deleteFile = deleteFile;
+    </script>
+</body>
+</html>
